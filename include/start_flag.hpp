@@ -1,3 +1,7 @@
+/*
+マルチ環境下での制御を行う
+今回いじる部分ではないかも
+*/
 #pragma once
 
 #include <mutex>
@@ -7,10 +11,10 @@
 //////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////
 
-class StartFlag {
+class StartFlag
+{
 
-public :
-
+public:
     // ready への書き込み
     void writeReady(bool flag);
 
@@ -20,20 +24,18 @@ public :
     // ready が true になるまで (開始の合図が来るまで) ロックする関数
     void lockWhileFalse();
 
-private :
-
-    bool ready_ = false; // 実験開始フラグ
-    std::mutex mtx_ready_; // ready 用の mutex
+private:
+    bool ready_ = false;              // 実験開始フラグ
+    std::mutex mtx_ready_;            // ready 用の mutex
     std::condition_variable cv_ready; // ready 用の condition variable
-
 };
 
 //////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////
 
-
-inline void StartFlag::writeReady(bool flag) {
+inline void StartFlag::writeReady(bool flag)
+{
     {
         std::unique_lock<std::mutex> uniq_lk(mtx_ready_);
         ready_ = flag;
@@ -41,19 +43,20 @@ inline void StartFlag::writeReady(bool flag) {
     }
 }
 
-
-inline bool StartFlag::readReady() {
+inline bool StartFlag::readReady()
+{
     {
         std::unique_lock<std::mutex> uniq_lk(mtx_ready_);
         return ready_;
     }
 }
 
-
-inline void StartFlag::lockWhileFalse() {
+inline void StartFlag::lockWhileFalse()
+{
     {
         std::unique_lock<std::mutex> uniq_lk(mtx_ready_);
-        cv_ready.wait(uniq_lk, [&]{ return ready_;});
+        cv_ready.wait(uniq_lk, [&]
+                      { return ready_; });
         ready_ = false;
     }
 }

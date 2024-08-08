@@ -1,3 +1,5 @@
+// https://chatgpt.com/c/5bc4cf71-4156-4cdd-8f6a-a1a81a1d3db4
+
 #pragma once
 
 #include <stdint.h>
@@ -22,12 +24,9 @@ struct Edge
     edge_data_t data;
     Edge() {}
     Edge(vertex_id_t _src, vertex_id_t _dst, edge_data_t _data) : src(_src), dst(_dst), data(_data) {}
-    bool friend operator == (const Edge<edge_data_t> &a, const Edge<edge_data_t> &b)
+    bool friend operator==(const Edge<edge_data_t> &a, const Edge<edge_data_t> &b)
     {
-        return (a.src == b.src
-            && a.dst == b.dst
-            && a.data == b.data
-        );
+        return (a.src == b.src && a.dst == b.dst && a.data == b.data);
     }
     void transpose()
     {
@@ -36,7 +35,7 @@ struct Edge
 };
 
 template <>
-struct Edge <EmptyData>
+struct Edge<EmptyData>
 {
     vertex_id_t src;
     union
@@ -46,11 +45,9 @@ struct Edge <EmptyData>
     };
     Edge() {}
     Edge(vertex_id_t _src, vertex_id_t _dst) : src(_src), dst(_dst) {}
-    bool friend operator == (const Edge<EmptyData> &a, const Edge<EmptyData> &b)
+    bool friend operator==(const Edge<EmptyData> &a, const Edge<EmptyData> &b)
     {
-        return (a.src == b.src
-            && a.dst == b.dst
-        );
+        return (a.src == b.src && a.dst == b.dst);
     }
     void transpose()
     {
@@ -66,11 +63,9 @@ struct Edge_dstIp
 
     Edge_dstIp() {}
     Edge_dstIp(vertex_id_t _src, vertex_id_t _dst, uint8_t _dst_ip) : src(_src), dst(_dst), dst_ip(_dst_ip) {}
-    bool friend operator == (const Edge_dstIp &a, const Edge_dstIp &b)
+    bool friend operator==(const Edge_dstIp &a, const Edge_dstIp &b)
     {
-        return (a.src == b.src
-            && a.dst == b.dst
-        );
+        return (a.src == b.src && a.dst == b.dst);
     }
     void transpose()
     {
@@ -78,14 +73,14 @@ struct Edge_dstIp
     }
 };
 
-template<typename edge_data_t>
+template <typename edge_data_t>
 struct AdjUnit
 {
     vertex_id_t neighbour;
     edge_data_t data;
 };
 
-template<>
+template <>
 struct AdjUnit<EmptyData>
 {
     union
@@ -95,7 +90,7 @@ struct AdjUnit<EmptyData>
     };
 };
 
-template<typename edge_data_t>
+template <typename edge_data_t>
 struct AdjList
 {
     AdjUnit<edge_data_t> *begin;
@@ -107,8 +102,8 @@ struct AdjList
     }
 };
 
-//comprised column row
-template<typename edge_data_t>
+// comprised column row
+template <typename edge_data_t>
 struct EdgeContainer
 {
     AdjList<edge_data_t> *adj_lists;
@@ -118,11 +113,11 @@ struct EdgeContainer
     {
         if (adj_lists != nullptr)
         {
-            delete []adj_lists;
+            delete[] adj_lists;
         }
         if (adj_units != nullptr)
         {
-            delete []adj_units;
+            delete[] adj_units;
         }
     }
 };

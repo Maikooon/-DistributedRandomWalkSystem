@@ -1,3 +1,7 @@
+/*
+ランダム数生成と時間計測の機能の提供
+何も考えずにそのまま使用すればよさそう
+*/
 #pragma once
 
 #include <sys/time.h>
@@ -21,6 +25,7 @@ class StdRandNumGenerator : public RandNumGenerator
 {
     std::random_device *rd;
     std::mt19937 *mt;
+
 public:
     StdRandNumGenerator()
     {
@@ -37,7 +42,7 @@ public:
         std::uniform_int_distribution<vertex_id_t> dis(0, upper_bound - 1);
         return dis(*mt);
     }
-    host_id_t genRandHostId(host_id_t mi, host_id_t ma) 
+    host_id_t genRandHostId(host_id_t mi, host_id_t ma)
     {
         std::uniform_int_distribution<vertex_id_t> dis(mi, ma);
         return dis(*mt);
@@ -49,10 +54,11 @@ public:
     }
 };
 
-//Timer is used for performance profiling
+// Timer is used for performance profiling
 class Timer
 {
     std::chrono::time_point<std::chrono::system_clock> _start = std::chrono::system_clock::now();
+
 public:
     void restart()
     {

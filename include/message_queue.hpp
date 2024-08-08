@@ -1,3 +1,21 @@
+/*
+複数のスレッドから安全にメッセージ（オブジェクト）をキューに追加および取り出すための機能
+マルチスレッド環境で安全に動作するメッセージキューを実装
+
+push メソッド:
+メッセージをキューに追加します。
+キューが空だった場合、他のスレッドに新しいメッセージが追加されたことを通知します。
+
+pop メソッド:
+キューからメッセージを全て取り出し、ベクターに格納します。
+取り出したメッセージの数を返します
+
+getSize メソッド:
+キューのサイズを返します。
+
+
+
+*/
 #pragma once
 
 #include <queue>
@@ -17,11 +35,12 @@
 //////////////////////////////////////////////////////////////////////////
 
 template <typename T>
-struct MessageQueue {
+struct MessageQueue
+{
 
-public :
-
-    void push(std::unique_ptr<T>&& message) {
+public:
+    void push(std::unique_ptr<T> &&message)
+    {
         { // 排他制御
             std::lock_guard<std::mutex> lk(mtx_message_queue_);
 
@@ -29,45 +48,50 @@ public :
 
             message_queue_.push(std::move(message));
 
-            if (queue_empty) { // 空キューでなくなった通知
+            if (queue_empty)
+            { // 空キューでなくなった通知
                 cv_message_queue_.notify_all();
             }
-
         }
     }
 
-    void push(std::vector<std::unique_ptr<RandomWalker>>& RWer_ptr_vec) {
+    void push(std::vector<std::unique_ptr<RandomWalker>> &RWer_ptr_vec)
+    {
         { // 排他制御
             std::lock_guard<std::mutex> lk(mtx_message_queue_);
 
             bool queue_empty = message_queue_.empty();
 
             uint32_t vec_size = RWer_ptr_vec.size();
-            for (int i = 0; i < vec_size; i++) {
+            for (int i = 0; i < vec_size; i++)
+            {
                 message_queue_.push(std::move(RWer_ptr_vec[i]));
             }
 
-            if (queue_empty) { // 空キューでなくなった通知
+            if (queue_empty)
+            { // 空キューでなくなった通知
                 cv_message_queue_.notify_all();
             }
-
         }
     }
 
     // message_queue_ から message をまとめて取り出す
     // vector に格納
     // 入れた数を返す
-    uint32_t pop(std::vector<std::unique_ptr<T>>& ptr_vec) {
+    uint32_t pop(std::vector<std::unique_ptr<T>> &ptr_vec)
+    {
         { // 排他制御
             std::unique_lock<std::mutex> lk(mtx_message_queue_);
 
             // RWer_Queue が空じゃなくなるまで待機
-            cv_message_queue_.wait(lk, [&]{ return !message_queue_.empty(); });
+            cv_message_queue_.wait(lk, [&]
+                                   { return !message_queue_.empty(); });
 
             uint32_t vec_size = message_queue_.size();
             ptr_vec.reserve(vec_size);
 
-            while (message_queue_.size()) {
+            while (message_queue_.size())
+            {
                 std::unique_ptr<T> ptr = std::move(message_queue_.front());
                 message_queue_.pop();
                 ptr_vec.push_back(std::move(ptr));
@@ -78,20 +102,19 @@ public :
     }
 
     // message_queue_ のサイズを入手
-    uint32_t getSize() {
+    uint32_t getSize()
+    {
         { // 排他制御
             std::lock_guard<std::mutex> lk(mtx_message_queue_);
 
             return message_queue_.size();
-        }        
+        }
     }
 
-private :
-
+private:
     std::queue<std::unique_ptr<T>> message_queue_;
     std::mutex mtx_message_queue_;
-    std::condition_variable cv_message_queue_; 
-
+    std::condition_variable cv_message_queue_;
 };
 
 //////////////////////////////////////////////////////////////////////////
