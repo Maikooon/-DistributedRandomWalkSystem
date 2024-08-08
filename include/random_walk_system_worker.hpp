@@ -663,14 +663,126 @@ inline void RandomWalkSystemWorker::procMessage(const uint16_t &proc_id)
 パケットの送信: メッセージが最大サイズに達するか、またはキューが空になった時点で、パケットを送信します。
 上記を繰り返す: キューが空になるまで、上記のプロセスを繰り返します。
 */
+
+// void RandomWalkSystemWorker::sendMessage()
+// {
+//     std::cout << "sendMessage" << std::endl;
+
+//     // ソケットの生成
+//     int sockfd = socket(AF_INET, SOCK_DGRAM, 0);
+//     // debug
+//     // std::cout << sockfd << std::endl;
+//     if (sockfd < 0)
+//     { // エラー処理
+//         perror("socket");
+//         exit(1); // 異常終了
+//     }
+
+//     StdRandNumGenerator gen;
+//     char message[MESSAGE_MAX_LENGTH_SEND];
+//     memset(message, 0, MESSAGE_MAX_LENGTH_SEND);
+//     uint8_t ver_id = RWERS;
+//     uint16_t RWer_count = 0;
+//     uint32_t now_length = 0;
+
+//     // アドレスの生成
+//     struct sockaddr_in addr;                      // 接続先の情報用の構造体(ipv4)
+//     memset(&addr, 0, sizeof(struct sockaddr_in)); // memsetで初期化
+//     addr.sin_family = AF_INET;                    // アドレスファミリ(ipv4)
+
+//     // 送信関数
+//     auto send_func = [&]()
+//     {
+//         // メッセージのヘッダ情報を書き込む
+//         // バージョン: 4bit (0),
+//         // メッセージID: 4bit (2),
+//         // メッセージに含まれるRWerの個数: 16bit
+//         memcpy(message, &ver_id, sizeof(ver_id));
+//         memcpy(message + sizeof(ver_id), &RWer_count, sizeof(RWer_count));
+//         now_length += sizeof(ver_id) + sizeof(RWer_count);
+
+//         // ポート番号指定
+//         addr.sin_port = htons(gen.genRandHostId(10000, 10000 + RECV_PORT - 1)); // ポート番号, htons()関数は16bitホストバイトオーダーをネットワークバイトオーダーに変換
+
+//         // データ送信
+//         sendto(sockfd, message, now_length, 0, (struct sockaddr *)&addr, sizeof(addr));
+
+//         // debug
+//         // std::cout << "send" << std::endl;
+
+//         // 変数初期化
+//         memset(message, 0, MESSAGE_MAX_LENGTH_SEND);
+//         RWer_count = 0;
+//         now_length = 0;
+//     };
+
+//     /*
+//         キューに複数のRwerが入っているので、それを空になるまで一つずつ送信していく
+//     */
+//     while (1)
+//     {
+//         // 送信先id取得
+//         host_id_t send_id = 0;
+//         {
+//             std::lock_guard<std::mutex> lk(mtx_id_num_);
+//             while (id_num_ == hostid_ || watching_queue_flag_[id_num_])
+//             {
+//                 id_num_ = (id_num_ + 1) % SEND_QUEUE_NUM;
+//             }
+//             send_id = id_num_;
+//             // debug
+//             // std::cout << "send_id: " << send_id << std::endl;
+//             watching_queue_flag_[send_id] = true;
+//             id_num_ = (id_num_ + 1) % SEND_QUEUE_NUM;
+//         }
+//         addr.sin_addr.s_addr = worker_ip_all_[send_id];
+
+//         // send_queue_ から RWer をまとめて取得
+//         if (send_queue_[send_id].getSize() == 0)
+//         {
+//             watching_queue_flag_[send_id] = false;
+//             continue;
+//         }
+//         std::vector<std::unique_ptr<RandomWalker>> RWer_ptr_vec;
+//         uint32_t vec_size = send_queue_[send_id].pop(RWer_ptr_vec);
+
+//         watching_queue_flag_[send_id] = false;
+
+//         // debug
+//         // std::cout << "vec_size: " << vec_size << std::endl;
+
+//         int idx = 0;
+//         while (idx < vec_size)
+//         {
+//             // RWer データサイズ
+//             uint32_t RWer_data_length = RWer_ptr_vec[idx]->getRWerSize();
+
+//             if (now_length + RWer_data_length >= MESSAGE_MAX_LENGTH_SEND - sizeof(ver_id) - sizeof(RWer_count))
+//             { // メッセージに収まりきらなくなったら送信
+//                 send_func();
+//             }
+
+//             // RWerの中身をメッセージに詰める
+//             // memcpy(message + now_length, &RWer, RWer_data_length);
+//             RWer_ptr_vec[idx]->writeMessage(message + sizeof(ver_id) + sizeof(RWer_count) + now_length);
+//             now_length += RWer_data_length;
+//             RWer_count++;
+//             idx++;
+//         }
+
+//         // 残りを送信
+//         if (RWer_count > 0)
+//             send_func();
+//     }
+// }
+
+// RWerを一つづつ送信する関数
 void RandomWalkSystemWorker::sendMessage()
 {
     std::cout << "sendMessage" << std::endl;
 
     // ソケットの生成
     int sockfd = socket(AF_INET, SOCK_DGRAM, 0);
-    // debug
-    // std::cout << sockfd << std::endl;
     if (sockfd < 0)
     { // エラー処理
         perror("socket");
@@ -681,43 +793,32 @@ void RandomWalkSystemWorker::sendMessage()
     char message[MESSAGE_MAX_LENGTH_SEND];
     memset(message, 0, MESSAGE_MAX_LENGTH_SEND);
     uint8_t ver_id = RWERS;
-    uint16_t RWer_count = 0;
+    uint16_t RWer_count = 1; // 常に1つのRWerを送るので1
     uint32_t now_length = 0;
 
     // アドレスの生成
-    struct sockaddr_in addr;                      // 接続先の情報用の構造体(ipv4)
-    memset(&addr, 0, sizeof(struct sockaddr_in)); // memsetで初期化
-    addr.sin_family = AF_INET;                    // アドレスファミリ(ipv4)
+    struct sockaddr_in addr;
+    memset(&addr, 0, sizeof(struct sockaddr_in));
+    addr.sin_family = AF_INET;
 
     // 送信関数
     auto send_func = [&]()
     {
-        // メッセージのヘッダ情報を書き込む
-        // バージョン: 4bit (0),
-        // メッセージID: 4bit (2),
-        // メッセージに含まれるRWerの個数: 16bit
         memcpy(message, &ver_id, sizeof(ver_id));
         memcpy(message + sizeof(ver_id), &RWer_count, sizeof(RWer_count));
         now_length += sizeof(ver_id) + sizeof(RWer_count);
 
         // ポート番号指定
-        addr.sin_port = htons(gen.genRandHostId(10000, 10000 + RECV_PORT - 1)); // ポート番号, htons()関数は16bitホストバイトオーダーをネットワークバイトオーダーに変換
+        addr.sin_port = htons(gen.genRandHostId(10000, 10000 + RECV_PORT - 1));
 
         // データ送信
         sendto(sockfd, message, now_length, 0, (struct sockaddr *)&addr, sizeof(addr));
 
-        // debug
-        // std::cout << "send" << std::endl;
-
-        // 変数初期化
+        // メッセージバッファをクリア
         memset(message, 0, MESSAGE_MAX_LENGTH_SEND);
-        RWer_count = 0;
         now_length = 0;
     };
 
-    /*
-        キューに複数のRwerが入っているので、それを空になるまで一つずつ送信していく
-    */
     while (1)
     {
         // 送信先id取得
@@ -729,14 +830,12 @@ void RandomWalkSystemWorker::sendMessage()
                 id_num_ = (id_num_ + 1) % SEND_QUEUE_NUM;
             }
             send_id = id_num_;
-            // debug
-            // std::cout << "send_id: " << send_id << std::endl;
             watching_queue_flag_[send_id] = true;
             id_num_ = (id_num_ + 1) % SEND_QUEUE_NUM;
         }
         addr.sin_addr.s_addr = worker_ip_all_[send_id];
 
-        // send_queue_ から RWer をまとめて取得
+        // send_queue_ から RWer を取得  ?????????????????????????????
         if (send_queue_[send_id].getSize() == 0)
         {
             watching_queue_flag_[send_id] = false;
@@ -747,31 +846,17 @@ void RandomWalkSystemWorker::sendMessage()
 
         watching_queue_flag_[send_id] = false;
 
-        // debug
-        // std::cout << "vec_size: " << vec_size << std::endl;
-
-        int idx = 0;
-        while (idx < vec_size)
+        for (int idx = 0; idx < vec_size; idx++)
         {
-            // RWer データサイズ
             uint32_t RWer_data_length = RWer_ptr_vec[idx]->getRWerSize();
 
-            if (now_length + RWer_data_length >= MESSAGE_MAX_LENGTH_SEND - sizeof(ver_id) - sizeof(RWer_count))
-            { // メッセージに収まりきらなくなったら送信
-                send_func();
-            }
+            // RWerのデータをメッセージに追加
+            RWer_ptr_vec[idx]->writeMessage(message + sizeof(ver_id) + sizeof(RWer_count));
+            now_length = RWer_data_length;
 
-            // RWerの中身をメッセージに詰める
-            // memcpy(message + now_length, &RWer, RWer_data_length);
-            RWer_ptr_vec[idx]->writeMessage(message + sizeof(ver_id) + sizeof(RWer_count) + now_length);
-            now_length += RWer_data_length;
-            RWer_count++;
-            idx++;
-        }
-
-        // 残りを送信
-        if (RWer_count > 0)
+            // 1つのRWerを送信
             send_func();
+        }
     }
 }
 
