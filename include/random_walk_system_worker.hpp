@@ -1,47 +1,3 @@
-/*
-not
-この RandomWalkSystemWorker::sendMessage メソッドは、サーバー間通信を行う
-特に、このメソッドはランダムウォーカー（RandomWalker）のデータをUDPパケットに詰めて他のサーバーに送信
-
-
-start():
-各種スレッド（ランダムウォーカー生成、メッセージ送信、メッセージ受信）を開始させます。
-
-generateRWerForMain():
-メイン処理用のランダムウォーカーを生成し、ランダムウォークを実行します。
-
-generateRWerForCache():
-キャッシュ補充用のランダムウォーカーを生成し、キャッシュにデータを登録します。
-
-executeRandomWalk(std::unique_ptr<RandomWalker> &&RWer_ptr, StdRandNumGenerator &gen):
-ランダムウォークを実行します。元のグラフデータやキャッシュデータを参照しながら、次のノードへ移動します。
-
-endRandomWalk(std::unique_ptr<RandomWalker> &&RWer_ptr):
-終了したランダムウォーカーの処理を行います。
-
-procMessage(const uint16_t &proc_id):
-メッセージキューからメッセージを取得し、処理します。
-
-//TODO:
-sendMessage():
-送信キューからランダムウォーカーを取得し、他サーバへ送信します。
-
-//TODO:
-receiveMessage(const uint16_t &port_num):
-指定されたポート番号でメッセージを受信し、メッセージキューにプッシュします。
-
-createUdpServerSocket(const uint16_t &port_num):
-指定されたポート番号でUDPサーバソケットを生成します。
-詳細処理には関わらなさそう
-
-createTcpServerSocket(const uint16_t &port_num):
-指定されたポート番号でTCPサーバソケットを生成します。
-詳細処理には関わらなさそう
-
-sendToStartManager():
-実験結果をスタートマネージャに送信します。
-
-*/
 #pragma once
 
 #include <string>
@@ -74,6 +30,9 @@ sendToStartManager():
 #include "start_flag.hpp"
 #include "random_walk_config.hpp"
 #include "random_walker_manager.hpp"
+#include "jwt.hpp"
+
+const size_t TOKEN_SIZE = 128; // JWT トークンのサイズを適切に設定
 
 //////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////
@@ -233,7 +192,6 @@ inline RandomWalkSystemWorker::RandomWalkSystemWorker(const std::string &dir_pat
     start();
 }
 
-// RWの実行を開始させる
 inline void RandomWalkSystemWorker::start()
 {
     std::thread thread_generateRWer(&RandomWalkSystemWorker::generateRWerForMain, this);
@@ -325,6 +283,7 @@ inline void RandomWalkSystemWorker::generateRWerForMain()
         for (int i = 0; i < PROC_MESSAGE_THREAD_NUM; i++)
         {
             threads_procMessage.emplace_back(std::thread(&RandomWalkSystemWorker::procMessage, this, i));
+            std::cout << "here " << std::endl;
         }
 
         threads_procMessage[0].join();
@@ -470,7 +429,6 @@ inline void RandomWalkSystemWorker::generateRWerForCache()
     std::cout << "PROC_MESSAGE join !" << std::endl;
 }
 
-// TODO'ランダムウォークを実行します。元のグラフデータやキャッシュデータを参照しながら、次のノードへ移動
 inline void RandomWalkSystemWorker::executeRandomWalk(std::unique_ptr<RandomWalker> &&RWer_ptr, StdRandNumGenerator &gen)
 {
 
@@ -617,6 +575,8 @@ inline void RandomWalkSystemWorker::procMessage(const uint16_t &proc_id)
 
     StdRandNumGenerator randgen;
 
+    int count = 0;
+
     while (PROC_MESSAGE_FLAG)
     {
         // メッセージキューからメッセージを取得
@@ -648,25 +608,20 @@ inline void RandomWalkSystemWorker::procMessage(const uint16_t &proc_id)
 
                 // RW を実行
                 executeRandomWalk(std::move(RWer_ptr_vec[i]), randgen);
+                // std::cout << "Rwを実行した " << std::endl;
+                count++;
             }
         }
     }
+    std ::cout << "count: " << count << std::endl;
 }
-
-// TODO: RWを他サーバに送信する関数,一つのメッセージに複数のRWを入れている部分が難点
-/*
-ソケットの生成: UDP通信用のソケットを作成します。
-メッセージの初期化: 送信するメッセージの初期化を行います。
-送信先アドレスの設定: 送信先のIPアドレスとポート番号を設定します。
-キューからのRWerの取り出し: 送信キューから、複数のRWerの情報を取得します。
-メッセージへのRWer情報の書き込み: 取得したRWerの情報を、メッセージに順番に書き込んでいきます。
-パケットの送信: メッセージが最大サイズに達するか、またはキューが空になった時点で、パケットを送信します。
-上記を繰り返す: キューが空になるまで、上記のプロセスを繰り返します。
-*/
 
 // void RandomWalkSystemWorker::sendMessage()
 // {
 //     std::cout << "sendMessage" << std::endl;
+
+//     // debug
+//     std::cout << "test send" << std::endl;
 
 //     // ソケットの生成
 //     int sockfd = socket(AF_INET, SOCK_DGRAM, 0);
@@ -677,6 +632,8 @@ inline void RandomWalkSystemWorker::procMessage(const uint16_t &proc_id)
 //         perror("socket");
 //         exit(1); // 異常終了
 //     }
+//     // debug
+//     std::cout << sockfd << std::endl;
 
 //     StdRandNumGenerator gen;
 //     char message[MESSAGE_MAX_LENGTH_SEND];
@@ -690,9 +647,20 @@ inline void RandomWalkSystemWorker::procMessage(const uint16_t &proc_id)
 //     memset(&addr, 0, sizeof(struct sockaddr_in)); // memsetで初期化
 //     addr.sin_family = AF_INET;                    // アドレスファミリ(ipv4)
 
+//     // debug
+//     std ::cout << "ready to send" << std::endl;
 //     // 送信関数
 //     auto send_func = [&]()
 //     {
+//         // debug
+//         std::cout << "認証を行う" << std::endl;
+
+//         // TODO:あとで消す
+//         //  JWT トークンの生成
+//         uint32_t RWer_id = RWer_count;              // RWer_id を適宜設定（ここでは RWer_count を使用）
+//         std::string secret_key = "your_secret_key"; // 秘密鍵を設定
+//         std::string token = generateJWT(RWer_id, secret_key);
+
 //         // メッセージのヘッダ情報を書き込む
 //         // バージョン: 4bit (0),
 //         // メッセージID: 4bit (2),
@@ -701,6 +669,11 @@ inline void RandomWalkSystemWorker::procMessage(const uint16_t &proc_id)
 //         memcpy(message + sizeof(ver_id), &RWer_count, sizeof(RWer_count));
 //         now_length += sizeof(ver_id) + sizeof(RWer_count);
 
+//         // TODO:あとで消す
+//         //  JWT トークンをメッセージに含める
+//         memcpy(message + now_length, token.c_str(), token.size());
+//         now_length += token.size();
+
 //         // ポート番号指定
 //         addr.sin_port = htons(gen.genRandHostId(10000, 10000 + RECV_PORT - 1)); // ポート番号, htons()関数は16bitホストバイトオーダーをネットワークバイトオーダーに変換
 
@@ -708,7 +681,7 @@ inline void RandomWalkSystemWorker::procMessage(const uint16_t &proc_id)
 //         sendto(sockfd, message, now_length, 0, (struct sockaddr *)&addr, sizeof(addr));
 
 //         // debug
-//         // std::cout << "send" << std::endl;
+//         std::cout << "データを送信しました" << std::endl;
 
 //         // 変数初期化
 //         memset(message, 0, MESSAGE_MAX_LENGTH_SEND);
@@ -716,9 +689,9 @@ inline void RandomWalkSystemWorker::procMessage(const uint16_t &proc_id)
 //         now_length = 0;
 //     };
 
-//     /*
-//         キューに複数のRwerが入っているので、それを空になるまで一つずつ送信していく
-//     */
+//     // debug
+//     std::cout << "send start before while" << std::endl;
+
 //     while (1)
 //     {
 //         // 送信先id取得
@@ -745,21 +718,32 @@ inline void RandomWalkSystemWorker::procMessage(const uint16_t &proc_id)
 //         }
 //         std::vector<std::unique_ptr<RandomWalker>> RWer_ptr_vec;
 //         uint32_t vec_size = send_queue_[send_id].pop(RWer_ptr_vec);
+//         // debug;キューから取り出したサイズをログ
+//         std::cout << "Popped vec_size: " << vec_size << " from send_queue_" << std::endl; // キューから取り出したサイズをログ
 
 //         watching_queue_flag_[send_id] = false;
 
 //         // debug
 //         // std::cout << "vec_size: " << vec_size << std::endl;
 
-//         int idx = 0;
+//         int idx = 0, count = 0;
 //         while (idx < vec_size)
 //         {
+//             // debug
+//             // count++;
+//             // std::cout << "Rwe/ message count: " << count << std::endl;
+
 //             // RWer データサイズ
 //             uint32_t RWer_data_length = RWer_ptr_vec[idx]->getRWerSize();
 
 //             if (now_length + RWer_data_length >= MESSAGE_MAX_LENGTH_SEND - sizeof(ver_id) - sizeof(RWer_count))
 //             { // メッセージに収まりきらなくなったら送信
+//                 // debug
+//                 std::cout << "送信します" << std::endl;
+//                 //
 //                 send_func();
+
+//                 // データを送信する関数
 //             }
 
 //             // RWerの中身をメッセージに詰める
@@ -772,95 +756,15 @@ inline void RandomWalkSystemWorker::procMessage(const uint16_t &proc_id)
 
 //         // 残りを送信
 //         if (RWer_count > 0)
-//             send_func();
+//             // 残りを送信しているのか
+//             std::cout << "残りを送信" << std::endl;
+//         send_func();
 //     }
+
+//     // debug
+//     std::cout << "キューから取り出してまとめて送る end" << std::endl;
 // }
 
-// RWerを一つづつ送信する関数
-void RandomWalkSystemWorker::sendMessage()
-{
-    std::cout << "sendMessage" << std::endl;
-
-    // ソケットの生成
-    int sockfd = socket(AF_INET, SOCK_DGRAM, 0);
-    if (sockfd < 0)
-    { // エラー処理
-        perror("socket");
-        exit(1); // 異常終了
-    }
-
-    StdRandNumGenerator gen;
-    char message[MESSAGE_MAX_LENGTH_SEND];
-    memset(message, 0, MESSAGE_MAX_LENGTH_SEND);
-    uint8_t ver_id = RWERS;
-    uint16_t RWer_count = 1; // 常に1つのRWerを送るので1
-    uint32_t now_length = 0;
-
-    // アドレスの生成
-    struct sockaddr_in addr;
-    memset(&addr, 0, sizeof(struct sockaddr_in));
-    addr.sin_family = AF_INET;
-
-    // 送信関数
-    auto send_func = [&]()
-    {
-        memcpy(message, &ver_id, sizeof(ver_id));
-        memcpy(message + sizeof(ver_id), &RWer_count, sizeof(RWer_count));
-        now_length += sizeof(ver_id) + sizeof(RWer_count);
-
-        // ポート番号指定
-        addr.sin_port = htons(gen.genRandHostId(10000, 10000 + RECV_PORT - 1));
-
-        // データ送信
-        sendto(sockfd, message, now_length, 0, (struct sockaddr *)&addr, sizeof(addr));
-
-        // メッセージバッファをクリア
-        memset(message, 0, MESSAGE_MAX_LENGTH_SEND);
-        now_length = 0;
-    };
-
-    while (1)
-    {
-        // 送信先id取得
-        host_id_t send_id = 0;
-        {
-            std::lock_guard<std::mutex> lk(mtx_id_num_);
-            while (id_num_ == hostid_ || watching_queue_flag_[id_num_])
-            {
-                id_num_ = (id_num_ + 1) % SEND_QUEUE_NUM;
-            }
-            send_id = id_num_;
-            watching_queue_flag_[send_id] = true;
-            id_num_ = (id_num_ + 1) % SEND_QUEUE_NUM;
-        }
-        addr.sin_addr.s_addr = worker_ip_all_[send_id];
-
-        // send_queue_ から RWer を取得  ?????????????????????????????
-        if (send_queue_[send_id].getSize() == 0)
-        {
-            watching_queue_flag_[send_id] = false;
-            continue;
-        }
-        std::vector<std::unique_ptr<RandomWalker>> RWer_ptr_vec;
-        uint32_t vec_size = send_queue_[send_id].pop(RWer_ptr_vec);
-
-        watching_queue_flag_[send_id] = false;
-
-        for (int idx = 0; idx < vec_size; idx++)
-        {
-            uint32_t RWer_data_length = RWer_ptr_vec[idx]->getRWerSize();
-
-            // RWerのデータをメッセージに追加
-            RWer_ptr_vec[idx]->writeMessage(message + sizeof(ver_id) + sizeof(RWer_count));
-            now_length = RWer_data_length;
-
-            // 1つのRWerを送信
-            send_func();
-        }
-    }
-}
-
-// TODO:受信したメッセージを処理する関数、ここで検証を行うか
 inline void RandomWalkSystemWorker::receiveMessage(const uint16_t &port_num)
 {
     std::cout << "receiveMessage: " << port_num << std::endl;
@@ -874,11 +778,11 @@ inline void RandomWalkSystemWorker::receiveMessage(const uint16_t &port_num)
         // messageを受信
         char message[MESSAGE_MAX_LENGTH_RECV];
         memset(message, 0, MESSAGE_MAX_LENGTH_RECV);
-        // メッセージを受信する、recv 関数でメッセージを受信します。
-        // 受信バッファを初期化し、指定された最大長までデータを読み込みます。
         recv(sockfd, message, MESSAGE_MAX_LENGTH_RECV, 0);
 
-        // メッセージのタイプを判定、タイプって何？
+        // debug
+        std::cout << "認証の検証を行う" << std::endl;
+
         uint8_t ver_id = *(uint8_t *)message;
 
         if ((ver_id & MASK_MESSEGEID) == START_EXP)
@@ -906,10 +810,27 @@ inline void RandomWalkSystemWorker::receiveMessage(const uint16_t &port_num)
             uint16_t RWer_count = *(uint16_t *)(message + idx);
             idx += sizeof(uint16_t);
 
+            // TODO:
+            // とりあえず同じ鍵を利用する
+            std::string secret_key = "your_secret_key"; // 秘密鍵を設定
+            // トークンの抽出
+            std::string token(message + idx, message + idx + TOKEN_SIZE);
+
+            // トークンの検証
+            uint32_t extracted_id;                                          // 取得したRWer_idを格納する変数
+            bool isTokenValid = verifyJWT(token, secret_key, extracted_id); // 修正済みのverifyJWT呼び出し
+
+            if (isTokenValid)
+            {
+                std::cout << "トークンの検証に成功しました: " << extracted_id << std::endl;
+            }
+            else
+            {
+                std::cerr << "トークンの検証に失敗しました" << std::endl;
+            }
+
             std::vector<std::unique_ptr<RandomWalker>> RWer_ptr_vec(RWer_count);
 
-            // ウォーカの数を取得し、それぞれのウォーカをメッセージから作成します。
-            // ウォーカを適切なキューに追加します。
             for (int i = 0; i < RWer_count; i++)
             {
                 // std::unique_ptr<RandomWalker> RWer_ptr(new RandomWalker(message + idx));
@@ -937,6 +858,7 @@ inline void RandomWalkSystemWorker::receiveMessage(const uint16_t &port_num)
 
             sendToStartManager();
         }
+
         else
         {
             perror("wrong id");

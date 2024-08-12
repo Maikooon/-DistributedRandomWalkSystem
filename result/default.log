@@ -1,0 +1,84 @@
+hostname: abilene03, nic: em1
+hostip_str_: 10.58.60.3
+0
+MY_EDGE_NUM: 49
+generateRWerForMain
+generateRWerForCache
+sendMessage
+sendMessage
+procMessage: 0, 0
+sendMessage
+procMessage: 1, 0
+receiveMessage: 10000
+sendMessage
+procMessage: 2, 0
+receiveMessage: 10001
+receiveMessage: 10002
+procMessage: 4, 0
+procMessage: 3, 0
+receiveMessage: 10003
+procMessage: 5, 0
+procMessage: 6, 0
+procMessage: 7, 0
+procMessage: 8, 0
+procMessage: 9, 0
+100002
+100001
+100003
+100000
+ex_time: 0.203601, cache_size: 105, RWer_id_all: 100000
+11
+connect
+send
+bind ok
+listen ok
+PROC_MESSAGE join !
+num_RWer = 10000
+start
+GENERATE_RWER_THREAD_NUM: 15
+generate end: 0.0718455
+procMessage: 12, 0
+procMessage: 5, 0
+procMessage: 3, 0
+procMessage: 13, 0
+procMessage: 9, 0
+procMessage: 4, 0
+procMessage: procMessage: 7procMessage: 140, , , 00
+
+0procMessage: 1, 0
+procMessage: 2, 0
+procMessage: procMessage: 6, 0
+procMessage: 10, 0
+11, 0
+
+
+///////////////////デバック部分
+procMessage: 8, 0
+end_count : 110000
+execution_time : 0.069
+RWer_queue_size: 15
+0: 0
+1: 0
+2: 0
+3: 0
+4: 0
+5: 0
+6: 0
+7: 0
+8: 0
+9: 0
+10: 0
+11: 0
+12: 0
+13: 0
+14: 0
+send_queue_size: 5
+0: 0
+1: 0
+2: 0
+3: 0
+4: 0
+re_send_count: 0
+my edges num: 49
+cache edges num: 105
+all edges: 154

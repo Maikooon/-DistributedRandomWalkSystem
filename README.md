@@ -33,5 +33,11 @@ Congerterdに格納されたバイナリファイルを分割する。
 ├── storage.hpp
 ├── type.hpp
 └── util.hpp
+,llllll
+
+
+g++ main.cpp -pthread -fopenmp -std=c++2a -I../jwt-cpp/include -o main --lcrypto
+
+g++ main.cpp -pthread -fopenmp -std=c++2a -I../jwt-cpp/include -o main -lcrypto
 
 
