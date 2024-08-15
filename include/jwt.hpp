@@ -36,3 +36,14 @@ bool verifyJWT(const std::string &token, const std::string &secret_key, uint32_t
         return false;
     }
 }
+/*
+検証時にでたエラーの種類は次の二つ
+An error occurred: invalid token supplied
+An error occurred: Invalid input: too much fill
+
+ーどのような時なのか
+ーどのような時に出るのか
+ー原因は何か
+ーどうすれば解消できるのか
+
+*/

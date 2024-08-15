@@ -6,7 +6,8 @@
 #include "../include/start_manager.hpp"
 
 // 「実験開始の合図を全サーバに送り、実験の終了を観測する」サーバ
-int main(int argc, char *argv[]) {
+int main(int argc, char *argv[])
+{
 
     // 分割数
     int split_num = 0;
@@ -46,6 +47,6 @@ int main(int argc, char *argv[]) {
     std::this_thread::sleep_for(std::chrono::seconds(wait_time));
 
     start.sendEnd(ofs_time, ofs_rerun);
-    
+
     std::this_thread::sleep_for(std::chrono::seconds(10));
 }

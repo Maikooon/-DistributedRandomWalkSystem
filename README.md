@@ -36,8 +36,16 @@ Congerterdに格納されたバイナリファイルを分割する。
 ,llllll
 
 
-g++ main.cpp -pthread -fopenmp -std=c++2a -I../jwt-cpp/include -o main --lcrypto
 
+//jwtなしのときの実行方法
+g++ main.cpp -pthread -fopenmp -std=c++2a
+./a.out ../dataset/split_graph/karate/3/
+
+//jwtありのときの実行方法
+//実行サーバと名前が被るのでこちら推奨
 g++ main.cpp -pthread -fopenmp -std=c++2a -I../jwt-cpp/include -o main -lcrypto
+./main ../dataset/split_graph/karate/3/
 
-
+//名前かぶる、非推奨
+g++ main.cpp -pthread -fopenmp -std=c++2a -I../jwt-cpp/include -lcrypto
+./a.out ../dataset/split_graph/karate/3/
