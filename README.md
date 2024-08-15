@@ -49,3 +49,9 @@ g++ main.cpp -pthread -fopenmp -std=c++2a -I../jwt-cpp/include -o main -lcrypto
 //名前かぶる、非推奨
 g++ main.cpp -pthread -fopenmp -std=c++2a -I../jwt-cpp/include -lcrypto
 ./a.out ../dataset/split_graph/karate/3/
+
+<!-- とるときに三文字かけてる　　　　eyj -->
+Received JWT:  hbGciOiJIUzI1NiJ9.eyJpZCI6IjYifQ.Wx11kP8GMJeUhnV4Th9t2tfCZyAIeidP1rcFiv_c_pY?h
+Generated JWT: eyJhbGciOiJIUzI1NiJ9.eyJpZCI6IjYifQ.Wx11kP8GMJeUhnV4Th9t2tfCZyAIeidP1rcFiv_c_pY
+
+--オフセットの計算がうまくいっていないのでは！
