@@ -30,9 +30,6 @@
 #include "start_flag.hpp"
 #include "random_walk_config.hpp"
 #include "random_walker_manager.hpp"
-#include "jwt.hpp"
-
-const size_t TOKEN_SIZE = 128; // JWT トークンのサイズを適切に設定
 
 //////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////
@@ -283,7 +280,7 @@ inline void RandomWalkSystemWorker::generateRWerForMain()
         for (int i = 0; i < PROC_MESSAGE_THREAD_NUM; i++)
         {
             threads_procMessage.emplace_back(std::thread(&RandomWalkSystemWorker::procMessage, this, i));
-            std::cout << "here " << std::endl;
+            // std::cout << "here " << std::endl;
         }
 
         threads_procMessage[0].join();
@@ -431,7 +428,11 @@ inline void RandomWalkSystemWorker::generateRWerForCache()
 
 inline void RandomWalkSystemWorker::executeRandomWalk(std::unique_ptr<RandomWalker> &&RWer_ptr, StdRandNumGenerator &gen)
 {
-
+    if (!RWer_ptr)
+    {
+        std::cerr << "Error: Received null pointer in executeRandomWalk!" << std::endl;
+        return;
+    }
     while (1)
     {
 
@@ -585,11 +586,14 @@ inline void RandomWalkSystemWorker::procMessage(const uint16_t &proc_id)
 
         // debug
         // RWer.printRWer();
-        // std::cout << "vec_size: " << vec_size << std::endl;
+        std::cout << "vec_size: " << vec_size << std::endl;
+
+        // ここまではおk
 
         for (int i = 0; i < vec_size; i++)
         {
             uint8_t message_id = RWer_ptr_vec[i]->getMessageID();
+            std::cout << "message_id: " << (int)message_id << std::endl;
             if (message_id == DEAD_SEND)
             { // 終了して送られてきた RWer の処理
 
@@ -607,8 +611,9 @@ inline void RandomWalkSystemWorker::procMessage(const uint16_t &proc_id)
             { // まだ生存している RWer の処理
 
                 // RW を実行
+                std::cout << "aaaaaaaaaaaaaaaa" << std::endl;
                 executeRandomWalk(std::move(RWer_ptr_vec[i]), randgen);
-                // std::cout << "Rwを実行した " << std::endl;
+                std::cout << "Rwを実行した " << std::endl;
                 count++;
             }
         }
@@ -616,18 +621,24 @@ inline void RandomWalkSystemWorker::procMessage(const uint16_t &proc_id)
     std ::cout << "count: " << count << std::endl;
 }
 
-// 1Rwerごとに送信する
 void RandomWalkSystemWorker::sendMessage()
 {
     std::cout << "sendMessage" << std::endl;
 
+    // debug
+    std::cout << "test send" << std::endl;
+
     // ソケットの生成
     int sockfd = socket(AF_INET, SOCK_DGRAM, 0);
+    // debug
+    // std::cout << sockfd << std::endl;
     if (sockfd < 0)
-    {
+    { // エラー処理
         perror("socket");
-        exit(1);
+        exit(1); // 異常終了
     }
+    // debug
+    std::cout << sockfd << std::endl;
 
     StdRandNumGenerator gen;
     char message[MESSAGE_MAX_LENGTH_SEND];
@@ -637,22 +648,31 @@ void RandomWalkSystemWorker::sendMessage()
     uint32_t now_length = 0;
 
     // アドレスの生成
-    struct sockaddr_in addr;
-    memset(&addr, 0, sizeof(struct sockaddr_in));
-    addr.sin_family = AF_INET;
+    struct sockaddr_in addr;                      // 接続先の情報用の構造体(ipv4)
+    memset(&addr, 0, sizeof(struct sockaddr_in)); // memsetで初期化
+    addr.sin_family = AF_INET;                    // アドレスファミリ(ipv4)
 
+    // debug
+    std ::cout << "ready to send" << std::endl;
+    // 送信関数
     auto send_func = [&]()
     {
         // メッセージのヘッダ情報を書き込む
+        // バージョン: 4bit (0),
+        // メッセージID: 4bit (2),
+        // メッセージに含まれるRWerの個数: 16bit
         memcpy(message, &ver_id, sizeof(ver_id));
         memcpy(message + sizeof(ver_id), &RWer_count, sizeof(RWer_count));
         now_length += sizeof(ver_id) + sizeof(RWer_count);
 
         // ポート番号指定
-        addr.sin_port = htons(gen.genRandHostId(10000, 10000 + RECV_PORT - 1));
+        addr.sin_port = htons(gen.genRandHostId(10000, 10000 + RECV_PORT - 1)); // ポート番号, htons()関数は16bitホストバイトオーダーをネットワークバイトオーダーに変換
 
         // データ送信
         sendto(sockfd, message, now_length, 0, (struct sockaddr *)&addr, sizeof(addr));
+
+        // debug
+        std::cout << "データを送信しました" << std::endl;
 
         // 変数初期化
         memset(message, 0, MESSAGE_MAX_LENGTH_SEND);
@@ -660,8 +680,12 @@ void RandomWalkSystemWorker::sendMessage()
         now_length = 0;
     };
 
+    // debug
+    std::cout << "send start before while" << std::endl;
+
     while (1)
     {
+        // 送信先id取得
         host_id_t send_id = 0;
         {
             std::lock_guard<std::mutex> lk(mtx_id_num_);
@@ -670,11 +694,14 @@ void RandomWalkSystemWorker::sendMessage()
                 id_num_ = (id_num_ + 1) % SEND_QUEUE_NUM;
             }
             send_id = id_num_;
+            // debug
+            // std::cout << "send_id: " << send_id << std::endl;
             watching_queue_flag_[send_id] = true;
             id_num_ = (id_num_ + 1) % SEND_QUEUE_NUM;
         }
         addr.sin_addr.s_addr = worker_ip_all_[send_id];
 
+        // send_queue_ から RWer をまとめて取得
         if (send_queue_[send_id].getSize() == 0)
         {
             watching_queue_flag_[send_id] = false;
@@ -682,42 +709,57 @@ void RandomWalkSystemWorker::sendMessage()
         }
         std::vector<std::unique_ptr<RandomWalker>> RWer_ptr_vec;
         uint32_t vec_size = send_queue_[send_id].pop(RWer_ptr_vec);
+        // debug;キューから取り出したサイズをログ
+        std::cout << "Popped vec_size: " << vec_size << " from send_queue_" << std::endl; // キューから取り出したサイズをログ
 
         watching_queue_flag_[send_id] = false;
 
-        int idx = 0;
+        // debug
+        // std::cout << "vec_size: " << vec_size << std::endl;
+
+        int idx = 0, count = 0;
         while (idx < vec_size)
         {
-            // 各 RWer に対してトークンを生成し、メッセージに追加
-            uint32_t RWer_id = idx; // 各 RWer に一意な ID を付与
-            std::string secret_key = "your_secret_key";
-            std::string token = generateJWT(RWer_id, secret_key);
-            // tokenのサイズを確認
-            std::cout << "generate token size: " << token.size() << std::endl;
+            // debug
+            // count++;
+            // std::cout << "Rwe/ message count: " << count << std::endl;
 
             // RWer データサイズ
             uint32_t RWer_data_length = RWer_ptr_vec[idx]->getRWerSize();
 
-            // トークンと RWer データをメッセージに追加
-            memcpy(message + now_length, token.c_str(), token.size());
-            now_length += token.size();
-            RWer_ptr_vec[idx]->writeMessage(message + now_length);
-            now_length += RWer_data_length;
-            RWer_count++;
-
-            // メッセージサイズ制限を超えた場合、送信
-            if (now_length >= MESSAGE_MAX_LENGTH_SEND - sizeof(ver_id) - sizeof(RWer_count))
-            {
+            if (now_length + RWer_data_length >= MESSAGE_MAX_LENGTH_SEND - sizeof(ver_id) - sizeof(RWer_count))
+            { // メッセージに収まりきらなくなったら送信
+                // debug
+                std::cout << "送信します" << std::endl;
+                //
                 send_func();
+
+                // データを送信する関数
             }
 
+            // ダミーバイト
+            // uint32_t dummy_data = 0;
+            // std::memcpy(message + now_length, &dummy_data, sizeof(dummy_data));
+            // now_length += sizeof(dummy_data);
+
+            // RWerの中身をメッセージに詰める
+            // memcpy(message + now_length, &RWer, RWer_data_length);
+            RWer_ptr_vec[idx]->writeMessage(message + sizeof(ver_id) + sizeof(RWer_count) + now_length);
+
+            now_length += RWer_data_length;
+            RWer_count++;
             idx++;
         }
 
         // 残りを送信
         if (RWer_count > 0)
-            send_func();
+            // 残りを送信しているのか
+            std::cout << "残りを送信" << std::endl;
+        send_func();
     }
+
+    // debug
+    std::cout << "キューから取り出してまとめて送る end" << std::endl;
 }
 
 inline void RandomWalkSystemWorker::receiveMessage(const uint16_t &port_num)
@@ -730,74 +772,68 @@ inline void RandomWalkSystemWorker::receiveMessage(const uint16_t &port_num)
 
     while (1)
     {
+        // messageを受信
         char message[MESSAGE_MAX_LENGTH_RECV];
         memset(message, 0, MESSAGE_MAX_LENGTH_RECV);
         recv(sockfd, message, MESSAGE_MAX_LENGTH_RECV, 0);
 
-        std::cout << "認証の検証を行う" << std::endl;
+        // debug
+        // std::cout << "認証の検証を行う" << std::endl;
 
         uint8_t ver_id = *(uint8_t *)message;
 
         if ((ver_id & MASK_MESSEGEID) == START_EXP)
-        {
+        { // 実験開始の合図
+
             uint32_t startmanager_ip = *(uint32_t *)(message + sizeof(ver_id));
             uint32_t num_RWer = *(uint32_t *)(message + sizeof(ver_id) + sizeof(startmanager_ip));
 
             startmanagerip_ = startmanager_ip;
             RW_config_.setNumberOfRWExecution(num_RWer);
 
+            // debug
             std::cout << "num_RWer = " << num_RWer << std::endl;
 
             MAIN_EX = true;
             CHECK_RWER_FLAG = false;
 
+            // 実験開始のフラグを立てる
             start_flag_.writeReady(true);
         }
         else if ((ver_id & MASK_MESSEGEID) == RWERS)
-        {
+        { // RWer のメッセージ
+            // message に入っている RWer の数を確認
             int idx = sizeof(uint8_t);
             uint16_t RWer_count = *(uint16_t *)(message + idx);
             idx += sizeof(uint16_t);
 
-            std::string secret_key = "your_secret_key";
+            std::vector<std::unique_ptr<RandomWalker>> RWer_ptr_vec(RWer_count);
 
-            std::vector<std::unique_ptr<RandomWalker>> RWer_ptr_vec;
+            RWer_ptr_vec.resize(RWer_count);
 
             for (int i = 0; i < RWer_count; i++)
             {
-                // トークンを抽出
-                std::string token(message + idx, message + idx + TOKEN_SIZE);
-                idx += TOKEN_SIZE;
 
-                // std::string token(message + idx, message + idx + token.size());
-                // idx += token.size();
-                // トークンの検証
-                uint32_t extracted_id;
-                bool isTokenValid = verifyJWT(token, secret_key, extracted_id);
+                std::cout << "っダミーをとる" << idx << std::endl;
+                // idx += 4;
+                // std::unique_ptr<RandomWalker> RWer_ptr(new RandomWalker(message + idx));
+                // RWer_ptr_vec[i] = std::make_unique<RandomWalker>(message + idx);
+                RWer_ptr_vec[i] = std::make_unique<RandomWalker>(message + idx);
 
-                if (isTokenValid)
-                {
-                    std::cout << "トークンの検証に成功しました: " << extracted_id << std::endl;
-                }
-                else
-                {
-                    std::cerr << "トークンの検証に失敗しました" << std::endl;
-                    // continue;
-                }
-
-                // RWer データを抽出
-                auto RWer_ptr = std::make_unique<RandomWalker>(message + idx);
-                RWer_ptr_vec.push_back(std::move(RWer_ptr));
-                idx += RWer_ptr_vec.back()->getRWerSize();
+                std::cout << "rwの大きさ前" << idx << std::endl;
+                idx += RWer_ptr_vec[i]->getRWerSize();
+                std::cout << "rwの大きさあと" << idx << std::endl;
             }
 
+            // まとめて RWer キューに push
             if (MAIN_EX)
                 RWer_queue_[gen.gen(PROC_MESSAGE_THREAD_NUM)].push(RWer_ptr_vec);
             else
                 RWer_queue_[gen.gen(PROC_MESSAGE_CACHE_THREAD_NUM)].push(RWer_ptr_vec);
         }
         else if ((ver_id & MASK_MESSEGEID) == CACHE_GEN)
-        {
+        { // キャッシュ生成用の RW 実行
+
             startmanagerip_ = *(uint32_t *)(message + sizeof(ver_id));
             MAIN_EX = false;
             CHECK_RWER_FLAG = true;
@@ -805,13 +841,14 @@ inline void RandomWalkSystemWorker::receiveMessage(const uint16_t &port_num)
             start_cache_flag_.writeReady(true);
         }
         else if ((ver_id & MASK_MESSEGEID) == END_EXP)
-        {
+        { // 実験結果を送信
+
             sendToStartManager();
         }
         else
         {
             perror("wrong id");
-            exit(1);
+            exit(1); // 異常終了
         }
     }
 }
