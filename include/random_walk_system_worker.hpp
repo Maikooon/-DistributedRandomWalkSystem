@@ -692,6 +692,8 @@ void RandomWalkSystemWorker::sendMessage()
             uint32_t RWer_id = idx; // 各 RWer に一意な ID を付与
             std::string secret_key = "your_secret_key";
             std::string token = generateJWT(RWer_id, secret_key);
+            // tokenのサイズを確認
+            std::cout << "generate token size: " << token.size() << std::endl;
 
             // RWer データサイズ
             uint32_t RWer_data_length = RWer_ptr_vec[idx]->getRWerSize();
@@ -764,9 +766,11 @@ inline void RandomWalkSystemWorker::receiveMessage(const uint16_t &port_num)
             for (int i = 0; i < RWer_count; i++)
             {
                 // トークンを抽出
-                std::string token(message + idx, message + idx + TOKEN_SIZE);
-                idx += TOKEN_SIZE;
+                // std::string token(message + idx, message + idx + TOKEN_SIZE);
+                // idx += TOKEN_SIZE;
 
+                std::string token(message + idx, message + idx + token.size());
+                idx += token.size();
                 // トークンの検証
                 uint32_t extracted_id;
                 bool isTokenValid = verifyJWT(token, secret_key, extracted_id);

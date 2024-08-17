@@ -51,9 +51,10 @@ int main()
 
     uint32_t RWer_id = 0;
 
-    std::cout << "RwID: " << RWer_id << std::endl;
+    std::cout << "RwID: " << token << std::endl;
     // トークン検証
-    if (verifyJWT(token, secret_key, RWer_id))
+    std::cout << token << std::endl;
+    if (verifyJWT("eyJhbGciOiJIUzI1NiJ9.eyJpZCI6IjEyMzQ1In0.3WpGvhzGul4RS_lRr7Xj44CXgD63t3mkZMZ4tfmkDtI", secret_key, RWer_id))
     {
         std::cout << "Token verified successfully. RWer_id: " << RWer_id << std::endl;
     }
@@ -64,3 +65,5 @@ int main()
 
     return 0;
 }
+
+//  g++ -std=c++11 verify_jwt.cpp -o verify_jwt -I/opt/homebrew/opt/openssl@3/include -L/opt/homebrew/opt/openssl@3/lib -lssl -lcrypto
