@@ -30,7 +30,6 @@
 #include "start_flag.hpp"
 #include "random_walk_config.hpp"
 #include "random_walker_manager.hpp"
-#include "jwt.hpp"
 
 //////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////
@@ -667,6 +666,11 @@ void RandomWalkSystemWorker::sendMessage()
         memcpy(message + sizeof(ver_id), &RWer_count, sizeof(RWer_count));
         now_length += sizeof(ver_id) + sizeof(RWer_count);
 
+        // TODO:あとで消す
+        //  JWT トークンをメッセージに含める
+        // memcpy(message + now_length, token.c_str(), token.size());
+        // now_length += token.size();
+
         // ポート番号指定
         addr.sin_port = htons(gen.genRandHostId(10000, 10000 + RECV_PORT - 1)); // ポート番号, htons()関数は16bitホストバイトオーダーをネットワークバイトオーダーに変換
 
@@ -725,11 +729,6 @@ void RandomWalkSystemWorker::sendMessage()
             // debug
             // count++;
             // std::cout << "Rwe/ message count: " << count << std::endl;
-
-            // テストTOKEN
-            // std::string secret_key = "your_secret_key";
-            // std::string token = generateJWT(ver_id, secret_key);
-            // std::cout << "token作成完了: " << token << std::endl;
 
             // RWer データサイズ
             uint32_t RWer_data_length = RWer_ptr_vec[idx]->getRWerSize();
@@ -812,23 +811,6 @@ inline void RandomWalkSystemWorker::receiveMessage(const uint16_t &port_num)
 
             for (int i = 0; i < RWer_count; i++)
             {
-
-                // テストTOKE N 複合回数＊実行時間
-                // std::string secret_key = "your_secret_key";
-                // std::string token = "eyJhbGciOiJIUzI1NiJ9.eyJpZCI6IjYifQ.Wx11kP8GMJeUhnV4Th9t2tfCZyAIeidP1rcFiv_c_pY";
-                // uint32_t extracted_id;
-                // bool isTokenValid = verifyJWT(token, secret_key, extracted_id);
-
-                // if (!isTokenValid)
-                // {
-                //     std::cerr << "トークンの検証に失敗しました: " << token << std::endl;
-                // }
-                // else
-                // {
-                //     std::cout << "トークンの検証に成功しました: " << token << std::endl;
-                // }
-                //////ここまで
-
                 // std::unique_ptr<RandomWalker> RWer_ptr(new RandomWalker(message + idx));
                 RWer_ptr_vec[i] = std::make_unique<RandomWalker>(message + idx);
                 idx += RWer_ptr_vec[i]->getRWerSize();
